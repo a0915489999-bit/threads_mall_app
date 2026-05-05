@@ -1,5 +1,11 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+# main.py
+import os
+from fastapi import FastAPI
+
+app = FastAPI()
+# ... 剩下的代碼
 
 app = FastAPI()
 
