@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 出錯就停止執行
 set -o errexit
 
-# 安裝依賴
-pip install --upgrade pip
 pip install -r requirements.txt
+
+# 執行種子資料腳本 (這行是新加的)
+python seed.py

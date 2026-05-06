@@ -1,39 +1,35 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-# main.py
-import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+import models
+from database import engine, get_db
+
+# 啟動時自動建立資料庫表
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-# ... 剩下的代碼
 
-app = FastAPI()
+# 根目錄路由，防止訪問時出現 404
+@app.get("/")
+def read_root():
+    return {"status": "success", "message": "Threads Mall API is Online", "database": "Connected"}
 
-# 模擬資料庫裡的商品資料
-fake_db = {
-    "product_001": {
-        "name": "二手 AirPods 4 (降噪版)",
-        "price": 3800,
-        "seller": "lin_bo_yu",
-        "desc": "來自 Threads 的精選商品，保存良好。"
+# 正式的商品查詢路徑
+@app.get("/product/{product_id}")
+def get_product(product_id: int, db: Session = Depends(get_db)):
+    # 從 PostgreSQL 資料庫搜尋
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    
+    if not product:
+        raise HTTPException(status_code=404, detail="商品不存在於資料庫中")
+    
+    # 計算佣金邏輯 (由後端統一控管)
+    commission = int(product.price * product.commission_rate)
+    
+    return {
+        "id": f"product_{product.id:03d}", # 格式化成你想要的 product_001 樣式
+        "name": product.name,
+        "price": product.price,
+        "platform_fee": commission,
+        "total_with_fee": product.price + commission,
+        "description": "來自 Threads 的精選商品，保存良好。"
     }
-}
-
-@app.get("/product/{pid}")
-async def get_product(pid: str):
-    if pid in fake_db:
-        item = fake_db[pid]
-        # 技術總監提醒：後端計算佣金最安全，防止前端被竄改
-        commission = int(item["price"] * 0.05)
-        return {
-            "id": pid,
-            "name": item["name"],
-            "price": item["price"],
-            "platform_fee": commission,
-            "total_with_fee": item["price"] + commission,
-            "seller": item["seller"],
-            "description": item["desc"]
-        }
-    return {"error": "商品不存在"}
-
-# 啟動指令：uvicorn main:app --reload
