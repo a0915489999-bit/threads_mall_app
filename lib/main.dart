@@ -34,30 +34,31 @@ class _ProductPageState extends State<ProductPage> {
     fetchProduct();
   }
 
-Future<void> fetchProduct() async {
+// 修改前的本地測試
+// final String url = 'http://127.0.0.1:8000/product/product_001';
+
+// 修改後的雲端正式版
+final String url = 'https://threads-mall-backend-ni-de-ming-zi.onrender.com/product/product_001';
+
+Future<void> fetchProductData() async {
   try {
-    // 模擬網路延遲 1.5 秒
-    await Future.delayed(const Duration(milliseconds: 1500));
+    final response = await http.get(Uri.parse(url));
     
-    // 直接寫死一段模擬 JSON 資料，不再去抓外部網址
-    const String mockResponse = '''
-    {
-      "seller": "lin_bo_yu",
-      "name": "二手 AirPods 4 (開發測試版)",
-      "price": 3800,
-      "description": "這是為了確保介面正確而產生的本地測試資料。"
+    if (response.statusCode == 200) {
+      // 解析雲端傳回的 JSON
+      var data = json.decode(response.body);
+      print("成功獲取雲端商品：${data['name']}");
+      
+      setState(() {
+        productName = data['name'];
+        price = data['price'];
+        // 記得加上你設計的 5% 佣金邏輯！
+      });
     }
-    ''';
-    
-    setState(() {
-      productData = json.decode(mockResponse);
-      isLoading = false;
-    });
   } catch (e) {
-    setState(() { isLoading = false; });
+    print("連線至 Render 失敗: $e");
   }
 }
-
   @override
   Widget build(BuildContext context) {
     if (isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.white)));
