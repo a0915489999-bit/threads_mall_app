@@ -1,26 +1,26 @@
+# seed.py
 from database import SessionLocal
 import models
 
 def seed_data():
     db = SessionLocal()
-    
-    # 檢查是否已經有資料，避免重複插入
-    existing_product = db.query(models.Product).filter(models.Product.id == 1).first()
-    
-    if not existing_product:
-        test_product = models.Product(
-            id=1,
-            name="Threads 聯名限量 T-Shirt",
-            price=590.0,
-            commission_rate=0.05
-        )
-        db.add(test_product)
-        db.commit()
-        print("✅ 成功寫入第一筆種子商品資料！")
-    else:
-        print("ℹ️ 資料庫中已存在商品資料，跳過寫入。")
-    
-    db.close()
-
-if __name__ == "__main__":
-    seed_data()
+    try:
+        # 關鍵：檢查 ID=1 是否存在
+        product = db.query(models.Product).filter(models.Product.id == 1).first()
+        if not product:
+            print("Creating seed data...")
+            new_p = models.Product(
+                id=1,
+                name="二手 AirPods 4 (降噪版)",
+                price=3800.0,
+                commission_rate=0.05
+            )
+            db.add(new_p)
+            db.commit()
+            print("✅ Seed success!")
+        else:
+            print("Product already exists.")
+    except Exception as e:
+        print(f"❌ Seed error: {e}")
+    finally:
+        db.close()
