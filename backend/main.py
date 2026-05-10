@@ -1,8 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-import models
-from database import engine, get_db
-import seed  # 確保同目錄下有 seed.py
+
+# 🔴 關鍵修正：加上 "." 代表在「同一個資料夾」內尋找
+from . import models, seed
+from .database import engine, get_db
+
+# ... 後面的程式碼保持不變
 
 # 啟動時自動建立資料庫表結構
 models.Base.metadata.create_all(bind=engine)
