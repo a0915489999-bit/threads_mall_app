@@ -3,15 +3,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# 取得環境變數
+# 1. 讀取連線網址
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
-# --- 診斷代碼：這會在 Render 日誌顯示連線狀況 ---
+# 2. 自動修正連線字串 (解決 NoSuchModuleError)
 if SQLALCHEMY_DATABASE_URL:
-    print(f"📡 [DEBUG] 正在連線至資料庫，網址開頭為: {SQLALCHEMY_DATABASE_URL[:10]}...")
-else:
-    print("❌ [ERROR] 完全讀取不到 DATABASE_URL 環境變數！")
-# --------------------------------------------
+    # 如果是舊版的 postgres:// 則改為 postgresql://
+    if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+        SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# 3. 建立連線引擎
+if not SQLALCHEMY_DATABASE_URL:
+    raise ValueError("❌ 錯誤：找不到 DATABASE_URL 環境變數，請在 Render 後台設定！")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
