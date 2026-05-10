@@ -1,6 +1,7 @@
 # seed.py
-from database import SessionLocal
-import models
+# ✅ 確保是這樣寫
+from .database import SessionLocal
+from .models import Product
 
 def seed_data():
     db = SessionLocal()
