@@ -7,6 +7,25 @@ from . import models, seed
 from .database import engine, get_db
 
 app = FastAPI()
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware  # <--- 1. 加入這行
+from sqlalchemy.orm import Session
+import os
+from . import models, seed
+from .database import engine, get_db
+
+app = FastAPI()
+
+# 2. 加入 CORS 設定，允許你的 Flutter Web 抓資料
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允許所有來源
+    allow_credentials=True,
+    allow_methods=["*"],  # 允許所有方法 (GET, POST 等)
+    allow_headers=["*"],  # 允許所有標頭
+)
+
+# ... 下面的程式碼保持不變 ...
 
 # 伺服器啟動時自動執行的任務
 @app.on_event("startup")
