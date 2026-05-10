@@ -32,7 +32,7 @@ class _ProductPageState extends State<ProductPage> {
   bool isLoading = true;
 
   // 🔴 請替換為你真正的 Render 網址（例如 https://xxx.onrender.com/product/1）
-  final String apiUrl = 'https://threads-mall-backend-ni-de-ming-zi.onrender.com';
+  final String apiUrl = 'https://threads-mall-backend-ni-de-ming-zi.onrender.com/product/1';
 
   @override
   void initState() {
