@@ -1,24 +1,28 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
+import os
 
-# 🔴 關鍵修正：加上 "." 代表在「同一個資料夾」內尋找
+# 這裡使用相對路徑導入
 from . import models, seed
 from .database import engine, get_db
 
-# ... 後面的程式碼保持不變
-
-# 啟動時自動建立資料庫表結構
-models.Base.metadata.create_all(bind=engine)
-
 app = FastAPI()
 
-# 核心：伺服器啟動時自動檢查並寫入 AirPods 種子資料
+# 伺服器啟動時自動執行的任務
 @app.on_event("startup")
 def startup_event():
-    print("🚀 伺服器啟動：執行資料庫初始化...")
-    seed.seed_data()
+    print("🚀 正在啟動伺服器並檢查資料庫...")
+    try:
+        # 1. 自動建立所有資料表 (如果不存在的話)
+        models.Base.metadata.create_all(bind=engine)
+        
+        # 2. 自動執行播種腳本，塞入 AirPods 4 資料
+        seed.seed_data()
+        print("✅ 資料庫初始化與播種完成！")
+    except Exception as e:
+        print(f"❌ 啟動初始化失敗: {e}")
 
-# 根目錄：用來檢查 API 是否活著
+# 根路徑測試
 @app.get("/")
 def read_root():
     return {
@@ -27,24 +31,16 @@ def read_root():
         "message": "歡迎來到 Threads Mall API"
     }
 
-# 商品查詢介面：直接對接 PostgreSQL
+# 取得商品詳細資料的 API
 @app.get("/product/{product_id}")
 def get_product(product_id: int, db: Session = Depends(get_db)):
-    # 搜尋 ID 為 1 的商品
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    
     if not product:
-        raise HTTPException(status_code=404, detail="商品不存在於資料庫中")
+        # 如果還是找不到，嘗試在查詢前再播種一次 (這是雙重保險)
+        seed.seed_data()
+        product = db.query(models.Product).filter(models.Product.id == product_id).first()
+        
+        if not product:
+            raise HTTPException(status_code=404, detail="商品不存在於資料庫中")
     
-    # 後端計算 5% 佣金
-    commission = int(product.price * product.commission_rate)
-    
-    return {
-        "id": product.id,
-        "name": product.name,
-        "price": int(product.price),
-        "platform_fee": commission,
-        "total_with_fee": int(product.price + commission),
-        "seller": "lin_bo_yu",
-        "description": "來自 Threads 的精選商品，保存良好，附原廠盒裝。國北教大校園可面交。"
-    }
+    return product
