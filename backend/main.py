@@ -1,61 +1,63 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import os
 
-# 這裡使用相對路徑導入
-from . import models, seed
-from .database import engine, get_db
-
-app = FastAPI()
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware  # <--- 1. 加入這行
-from sqlalchemy.orm import Session
-import os
 from . import models, seed
 from .database import engine, get_db
 
 app = FastAPI()
 
-# 2. 加入 CORS 設定，允許你的 Flutter Web 抓資料
+# 開放 CORS 權限
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允許所有來源
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # 允許所有方法 (GET, POST 等)
-    allow_headers=["*"],  # 允許所有標頭
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# ... 下面的程式碼保持不變 ...
-
-# 伺服器啟動時自動執行的任務
 @app.on_event("startup")
 def startup_event():
-    print("🚀 正在重建資料庫結構並初始化...")
+    print("🚀 正在執行資料庫強力重置與初始化...")
     try:
-        # 這行會根據 models.py 建立所有遺漏的資料表
+        # 1. 強力拆除舊結構 (解決重複定義報錯)
+        models.Base.metadata.drop_all(bind=engine)
+        
+        # 2. 建立全新社交電商結構
         models.Base.metadata.create_all(bind=engine)
+        
+        # 3. 執行新版播種邏輯
         seed.seed_data()
+        print("✅ 資料庫重生完成！")
     except Exception as e:
         print(f"❌ 啟動失敗: {e}")
-# 根路徑測試
+
 @app.get("/")
 def read_root():
-    return {
-        "status": "Online",
-        "database": "PostgreSQL Connected",
-        "message": "歡迎來到 Threads Mall API"
-    }
+    return {"status": "Online", "message": "Threads Mall API (Social Version) is running"}
 
-# 取得商品詳細資料的 API
+# 取得動態牆 (Feed)
+@app.get("/feed/")
+def get_feed(db: Session = Depends(get_db)):
+    # 這裡會回傳所有商品，包含賣家資訊
+    products = db.query(models.Product).all()
+    result = []
+    for p in products:
+        result.append({
+            "id": p.id,
+            "username": p.owner.username if p.owner else "未知用戶",
+            "avatar_url": p.owner.avatar_url if p.owner else "",
+            "content": p.content,
+            "price": p.price,
+            "image_url": p.image_url,
+            "commission_rate": p.commission_rate
+        })
+    return result
+
 @app.get("/product/{product_id}")
 def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product:
-        # 如果還是找不到，嘗試在查詢前再播種一次 (這是雙重保險)
-        seed.seed_data()
-        product = db.query(models.Product).filter(models.Product.id == product_id).first()
-        
-        if not product:
-            raise HTTPException(status_code=404, detail="商品不存在於資料庫中")
-    
+        raise HTTPException(status_code=404, detail="Product not found")
     return product
