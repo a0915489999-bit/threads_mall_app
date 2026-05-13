@@ -30,17 +30,13 @@ app.add_middleware(
 # 伺服器啟動時自動執行的任務
 @app.on_event("startup")
 def startup_event():
-    print("🚀 正在啟動伺服器並檢查資料庫...")
+    print("🚀 正在重建資料庫結構並初始化...")
     try:
-        # 1. 自動建立所有資料表 (如果不存在的話)
+        # 這行會根據 models.py 建立所有遺漏的資料表
         models.Base.metadata.create_all(bind=engine)
-        
-        # 2. 自動執行播種腳本，塞入 AirPods 4 資料
         seed.seed_data()
-        print("✅ 資料庫初始化與播種完成！")
     except Exception as e:
-        print(f"❌ 啟動初始化失敗: {e}")
-
+        print(f"❌ 啟動失敗: {e}")
 # 根路徑測試
 @app.get("/")
 def read_root():

@@ -1,28 +1,39 @@
 from .database import SessionLocal
-from . import models  # 關鍵：這樣才能用 models.Product
+from . import models
 
 def seed_data():
     db = SessionLocal()
     try:
-        # 確保 models.Product 已經被正確定義且對應到資料表
-        # 檢查是否已經有 AirPods 4 (ID 為 1)
+        # 1. 建立預設賣家 (測試帳號)
+        admin = db.query(models.User).filter(models.User.id == 1).first()
+        if not admin:
+            admin = models.User(
+                id=1,
+                username="林帛諭_Dev",
+                avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=Lin"
+            )
+            db.add(admin)
+            db.commit()
+            print("✅ 測試賣家帳號已建立")
+
+        # 2. 建立 AirPods 4 商品並關聯到該賣家
         existing_product = db.query(models.Product).filter(models.Product.id == 1).first()
-        
         if not existing_product:
-            print("正在寫入 AirPods 4 到資料庫...")
             new_product = models.Product(
                 id=1,
-                name="AirPods 4",
-                price=5000,
+                content="全新 AirPods 4，國北教大面交優先！",
+                price=5000.0,
+                image_url="https://www.apple.com/v/airpods-4/a/images/overview/finish/finish_airpods_4__f9p4id59v96u_large.jpg",
+                owner_id=1, # 關聯到剛剛建立的 User ID 1
                 commission_rate=0.05
             )
             db.add(new_product)
             db.commit()
-            print("✅ 種子資料寫入成功！")
+            print("✅ AirPods 4 播種成功，已掛載至賣家帳號")
         else:
-            print("ℹ️ 資料已存在，跳過初始化。")
+            print("ℹ️ 資料已存在，跳過播種。")
+            
     except Exception as e:
-        # 這裡就是你剛才看到 "name 'models' is not defined" 的地方
-        print(f"❌ Seed error: {e}")
+        print(f"❌ Seed Error: {e}")
     finally:
         db.close()
