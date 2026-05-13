@@ -22,7 +22,6 @@ def startup_event():
     print("🚀 正在執行資料庫強力重置與初始化...")
     try:
         # 1. 強力拆除舊結構 (解決重複定義報錯)
-        models.Base.metadata.drop_all(bind=engine)
         
         # 2. 建立全新社交電商結構
         models.Base.metadata.create_all(bind=engine)
