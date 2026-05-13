@@ -14,8 +14,7 @@ class ThreadsFeedPage extends StatefulWidget {
 }
 
 class _ThreadsFeedPageState extends State<ThreadsFeedPage> {
-  // 🔴 請確保這是你的真實 Render 網址 (最後要有 /feed/)
-  final String apiUrl = 'https://threads-mall-api.onrender.com/feed/';
+  final String baseUrl = 'https://threads-mall-api.onrender.com';
   List<dynamic> posts = [];
   bool isLoading = true;
 
@@ -25,9 +24,10 @@ class _ThreadsFeedPageState extends State<ThreadsFeedPage> {
     fetchFeed();
   }
 
+  // 取得動態牆
   Future<void> fetchFeed() async {
     try {
-      final response = await http.get(Uri.parse(apiUrl));
+      final response = await http.get(Uri.parse('$baseUrl/feed/'));
       if (response.statusCode == 200) {
         setState(() {
           posts = json.decode(response.body);
@@ -40,6 +40,73 @@ class _ThreadsFeedPageState extends State<ThreadsFeedPage> {
     }
   }
 
+  // 發布商品到後端
+  Future<void> _postProduct(String content, double price, String imageUrl) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/products/'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "content": content,
+          "price": price,
+          "image_url": imageUrl,
+          "owner_id": 1, // 暫時關聯到你的 ID
+        }),
+      );
+      if (response.statusCode == 200) {
+        fetchFeed(); // 成功後自動刷新
+      }
+    } catch (e) {
+      debugPrint("發布失敗: $e");
+    }
+  }
+
+  // 顯示 Threads 風格發文彈窗
+  void _showPostDialog() {
+    final TextEditingController contentController = TextEditingController();
+    final TextEditingController priceController = TextEditingController();
+    final TextEditingController imageController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("發表新商品貼文", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            TextField(controller: contentController, decoration: const InputDecoration(hintText: "描述你的商品...", border: InputBorder.none)),
+            TextField(controller: priceController, decoration: const InputDecoration(hintText: "價格 (TWD)", prefixIcon: Icon(Icons.attach_money))),
+            TextField(controller: imageController, decoration: const InputDecoration(hintText: "圖片網址 (可選)", prefixIcon: Icon(Icons.image))),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (contentController.text.isNotEmpty) {
+                    _postProduct(
+                      contentController.text,
+                      double.tryParse(priceController.text) ?? 0,
+                      imageController.text.isEmpty ? "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1000&auto=format&fit=crop" : imageController.text,
+                    );
+                    Navigator.pop(context);
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                child: const Text("發布"),
+              ),
+            ),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -47,20 +114,21 @@ class _ThreadsFeedPageState extends State<ThreadsFeedPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text("Threads Mall",
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text("Threads Mall", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.black))
-          : RefreshIndicator(
-              onRefresh: fetchFeed,
-              child: ListView.separated(
-                itemCount: posts.length,
-                separatorBuilder: (context, index) => const Divider(height: 1),
-                itemBuilder: (context, index) => _buildThreadCard(posts[index]),
-              ),
-            ),
+          : RefreshIndicator(onRefresh: fetchFeed, child: ListView.separated(
+              itemCount: posts.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) => _buildThreadCard(posts[index]),
+            )),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showPostDialog,
+        backgroundColor: Colors.black,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
@@ -70,58 +138,38 @@ class _ThreadsFeedPageState extends State<ThreadsFeedPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 左側：頭像與線條
           Column(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundImage: NetworkImage(data['avatar_url'] ?? "https://via.placeholder.com/150"),
-              ),
+              CircleAvatar(radius: 20, backgroundImage: NetworkImage(data['avatar_url'] ?? "")),
               const SizedBox(height: 8),
-              Container(width: 2, height: 80, color: Colors.grey[200]),
+              Container(width: 2, height: 100, color: Colors.grey[100]),
             ],
           ),
           const SizedBox(width: 12),
-          // 右側：內容區
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(data['username'] ?? "未知用戶",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(data['username'] ?? "未知用戶", style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(data['content'] ?? "", style: const TextStyle(fontSize: 15)),
+                Text(data['content'] ?? ""),
                 if (data['image_url'] != null && data['image_url'].isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(data['image_url'], fit: BoxFit.cover),
-                    ),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(data['image_url'], fit: BoxFit.cover)),
                   ),
-                const SizedBox(height: 8),
-                // 互動按鈕列
                 Row(
                   children: [
                     const Icon(Icons.favorite_border, size: 20),
                     const SizedBox(width: 16),
                     const Icon(Icons.chat_bubble_outline, size: 20),
                     const SizedBox(width: 16),
-                    const Icon(Icons.repeat, size: 20),
-                    const SizedBox(width: 16),
-                    // 購買按鈕
                     GestureDetector(
                       onTap: () => _showPurchaseDialog(data),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          "購買 \$${data['price']}",
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
+                        decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(20)),
+                        child: Text("購買 \$${data['price']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                     ),
                   ],
@@ -139,7 +187,7 @@ class _ThreadsFeedPageState extends State<ThreadsFeedPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("確認購買"),
-        content: Text("商品: ${data['content']}\n價格: \$${data['price']}\n平台抽成(5%): \$${(data['price'] * 0.05).toStringAsFixed(2)}"),
+        content: Text("價格: \$${data['price']}\n平台服務費(5%): \$${(data['price'] * 0.05).toStringAsFixed(2)}"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("取消")),
           ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("確認支付")),

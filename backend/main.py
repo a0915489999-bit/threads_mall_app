@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 import os
 
 from . import models, seed
@@ -8,7 +9,7 @@ from .database import engine, get_db
 
 app = FastAPI()
 
-# 開放 CORS 權限
+# 開放 CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,30 +18,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 定義前端發送過來的資料格式
+class ProductCreate(BaseModel):
+    content: str
+    price: float
+    image_url: str
+    owner_id: int
+
 @app.on_event("startup")
 def startup_event():
-    print("🚀 正在執行資料庫強力重置與初始化...")
+    print("🚀 啟動中...")
     try:
-        # 1. 強力拆除舊結構 (解決重複定義報錯)
-        
-        # 2. 建立全新社交電商結構
+        # 注意：這裡已經移除 drop_all，以免每次啟動都清空你的資料
         models.Base.metadata.create_all(bind=engine)
-        
-        # 3. 執行新版播種邏輯
         seed.seed_data()
-        print("✅ 資料庫重生完成！")
     except Exception as e:
         print(f"❌ 啟動失敗: {e}")
 
 @app.get("/")
 def read_root():
-    return {"status": "Online", "message": "Threads Mall API (Social Version) is running"}
+    return {"status": "Online", "version": "v2.0-social"}
 
 # 取得動態牆 (Feed)
 @app.get("/feed/")
 def get_feed(db: Session = Depends(get_db)):
-    # 這裡會回傳所有商品，包含賣家資訊
-    products = db.query(models.Product).all()
+    products = db.query(models.Product).order_by(models.Product.created_at.desc()).all()
     result = []
     for p in products:
         result.append({
@@ -54,9 +56,17 @@ def get_feed(db: Session = Depends(get_db)):
         })
     return result
 
-@app.get("/product/{product_id}")
-def get_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return product
+# 新增商品 (發文上架)
+@app.post("/products/")
+def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+    new_product = models.Product(
+        content=product.content,
+        price=product.price,
+        image_url=product.image_url,
+        owner_id=product.owner_id,
+        commission_rate=0.05
+    )
+    db.add(new_product)
+    db.commit()
+    db.refresh(new_product)
+    return new_product
